@@ -6,9 +6,11 @@
   <title>LifeCraft - Collage & Video Creator</title>
   <link rel="manifest" href="manifest.json">
   <!-- Google Fonts for stylish event options -->
-  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Cinzel:wght@700&family=Fredoka+One&family=Montserrat:wght@700&display=swap" rel="stylesheet">
-  <!-- Fabric.js handles object scaling, rotation, and layers -->
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght=700&family=Cinzel:wght=700&family=Fredoka+One&family=Montserrat:wght=700&display=swap" rel="stylesheet">
+  
+  <!-- 1. SECURE HTTPS CDN FOR FABRIC.JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+
   <style>
     :root {
       --primary: #FF6B6B;
@@ -70,15 +72,24 @@
       padding-left: 8px;
     }
 
+    /* 2. FIXED LAYOUT BLOCK CONTAINMENT SYSTEM FOR MOBILE BROWSERS */
     .canvas-container-wrapper {
-      display: flex;
-      justify-content: center;
-      align-items: center;
+      display: block;
+      width: 360px;
+      height: 360px;
+      margin: 0 auto 15px auto;
       background: #eef1f6;
       border-radius: 12px;
       overflow: hidden;
-      margin-bottom: 15px;
       border: 3px dashed var(--secondary);
+      position: relative;
+    }
+
+    /* Prevents the Fabric container wrapper from flattening inside production viewports */
+    .canvas-container {
+      width: 360px !important;
+      height: 360px !important;
+      margin: 0 auto;
     }
 
     .control-group {
@@ -329,21 +340,32 @@
   </div>
 
   <script>
-    const canvas = new fabric.Canvas('collageCanvas', {
-      backgroundColor: '#ffffff',
-      preserveObjectStacking: true
-    });
-
+    let canvas;
     let uploadedImages = [];
     let borderFrame = null;
     let textObject = null;
     let selectedAudioBuffer = null;
     let audioContext = null;
 
-    canvas.on('selection:created', onObjectSelected);
-    canvas.on('selection:updated', onObjectSelected);
-    canvas.on('selection:cleared', () => {
-      document.getElementById('transformControls').style.display = 'none';
+    // 3. SECURE DOM GUARANTEED CANVAS INITIALIZATION
+    window.addEventListener('DOMContentLoaded', () => {
+      canvas = new fabric.Canvas('collageCanvas', {
+        width: 360,
+        height: 360,
+        backgroundColor: '#ffffff',
+        preserveObjectStacking: true
+      });
+      
+      canvas.calcOffset();
+
+      canvas.on('selection:created', onObjectSelected);
+      canvas.on('selection:updated', onObjectSelected);
+      canvas.on('selection:cleared', () => {
+        document.getElementById('transformControls').style.display = 'none';
+      });
+      
+      // Initialize layout elements
+      canvas.renderAll();
     });
 
     function onObjectSelected(e) {
@@ -357,16 +379,19 @@
     }
 
     document.getElementById('angleSlider').addEventListener('input', function() {
+      if(!canvas) return;
       let active = canvas.getActiveObject();
       if (active) { active.set('angle', parseInt(this.value)).setCoords(); canvas.renderAll(); }
     });
 
     document.getElementById('scaleSlider').addEventListener('input', function() {
+      if(!canvas) return;
       let active = canvas.getActiveObject();
       if (active) { active.scale(parseFloat(this.value)).setCoords(); canvas.renderAll(); }
     });
 
     function deleteSelectedObj() {
+      if(!canvas) return;
       let active = canvas.getActiveObject();
       if (active) {
         uploadedImages = uploadedImages.filter(img => img !== active);
@@ -378,7 +403,7 @@
     }
 
     function clearAllImages() {
-      if (uploadedImages.length === 0) return;
+      if (!canvas || uploadedImages.length === 0) return;
       uploadedImages.forEach(img => canvas.remove(img));
       uploadedImages = [];
       canvas.discardActiveObject();
@@ -386,17 +411,16 @@
       document.getElementById('statusLog').innerText = "Cleared all photos from layout!";
     }
 
-    // FIXED: Uses fabric.Image.fromURL structure to avoid live HTTPS sandbox blocks on GitHub Pages
+    // 4. SECURE ASYNC FILE READER (NO INTERFERENCE FROM CORS CONTEXT ENFORCEMENTS)
     function handleImageFiles(files) {
-      if(!files.length) return;
+      if(!canvas || !files.length) return;
       
       for (let i = 0; i < files.length; i++) {
         const reader = new FileReader();
         reader.onload = function(event) {
-          const dataUrl = event.target.result;
-          
-          fabric.Image.fromURL(dataUrl, function(fabricImg) {
-            fabricImg.set({
+          const imgElement = new Image();
+          imgElement.onload = function() {
+            const fabricImg = new fabric.Image(imgElement, {
               left: 40 + (uploadedImages.length * 30) % 140,
               top: 40 + (uploadedImages.length * 30) % 140,
               cornerColor: '#4ECDC4',
@@ -409,7 +433,9 @@
             uploadedImages.push(fabricImg);
             
             arrangeLayerOrder();
-          }, { crossOrigin: 'anonymous' }); // Guarantees security handshake parity over live web-servers
+            canvas.renderAll();
+          };
+          imgElement.src = event.target.result;
         };
         reader.readAsDataURL(files[i]);
       }
@@ -436,6 +462,7 @@
     });
 
     function arrangeLayerOrder() {
+      if(!canvas) return;
       if (borderFrame) {
         canvas.sendToBack(borderFrame);
       }
@@ -449,7 +476,7 @@
     }
 
     function generateRandomLayout() {
-      if (uploadedImages.length === 0) return;
+      if (!canvas || uploadedImages.length === 0) return;
       uploadedImages.forEach((img, index) => {
         const sliceAngle = (360 / uploadedImages.length) * index;
         const radian = (sliceAngle * Math.PI) / 180;
@@ -457,16 +484,19 @@
         const targetY = (canvas.height / 2) + Math.sin(radian) * 60 - 90;
         const randomTilt = Math.floor(Math.random() * 30) - 15;
 
-        img.animate({ left: targetX, top: targetY, angle: randomTilt }, {
-          duration: 500,
+        img.animate('left', targetX, { duration: 400, onChange: canvas.renderAll.bind(canvas) });
+        img.animate('top', targetY, { duration: 400, onChange: canvas.renderAll.bind(canvas) });
+        img.animate('angle', randomTilt, {
+          duration: 400,
           onChange: canvas.renderAll.bind(canvas),
           easing: fabric.util.ease.easeOutBack
         });
       });
-      setTimeout(arrangeLayerOrder, 550);
+      setTimeout(arrangeLayerOrder, 450);
     }
 
     function applyThemeDecoration() {
+      if(!canvas) return;
       const theme = document.getElementById('themeSelect').value;
       if (borderFrame) { canvas.remove(borderFrame); borderFrame = null; }
 
@@ -481,7 +511,6 @@
           document.getElementById('customText').value = "HAPPY BIRTHDAY 🎉";
           document.getElementById('textBgColor').value = "#ff4a75";
           document.getElementById('textColor').value = "#ffffff";
-          updateCustomText();
           break;
         case 'anniversary':
           frameColor = '#D4AF37';
@@ -490,7 +519,6 @@
           document.getElementById('customText').value = "HAPPY ANNIVERSARY ❤️";
           document.getElementById('textBgColor').value = "#D4AF37";
           document.getElementById('textColor').value = "#ffffff";
-          updateCustomText();
           break;
         case 'vacation':
           frameColor = '#4ECDC4';
@@ -499,7 +527,6 @@
           document.getElementById('customText').value = "VACATION MEMORIES 🌴";
           document.getElementById('textBgColor').value = "#4ECDC4";
           document.getElementById('textColor').value = "#ffffff";
-          updateCustomText();
           break;
         case 'graduation':
           frameColor = '#2C3E50';
@@ -508,7 +535,6 @@
           document.getElementById('customText').value = "CLASS OF 2026 🎓";
           document.getElementById('textBgColor').value = "#2C3E50";
           document.getElementById('textColor').value = "#ffffff";
-          updateCustomText();
           break;
         default:
           canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
@@ -529,10 +555,12 @@
         });
         canvas.add(borderFrame);
       }
-      arrangeLayerOrder();
+      
+      updateCustomText();
     }
 
     function updateCustomText() {
+      if(!canvas) return;
       const textVal = document.getElementById('customText').value;
       const colorVal = document.getElementById('textColor').value;
       const bgBarColorVal = document.getElementById('textBgColor').value;
@@ -546,7 +574,6 @@
       }
 
       let textOptions = {
-        text: textVal,
         fill: colorVal,
         textBackgroundColor: bgBarColorVal,
         fontFamily: fontVal,
@@ -569,44 +596,23 @@
 
       if (textObject) {
         textObject.set(textOptions);
+        textObject.set('text', textVal);
       } else {
         textOptions.top = canvas.height - 35;
         textOptions.originY = 'center';
         textObject = new fabric.Text(textVal, textOptions);
         canvas.add(textObject);
       }
+      
       arrangeLayerOrder();
     }
 
     function downloadCollageImage() {
+      if(!canvas) return;
       canvas.discardActiveObject();
       canvas.renderAll();
       const dataURL = canvas.toDataURL({ format: 'jpeg', quality: 0.95 });
       const link = document.createElement('a');
       link.download = 'lifecraft-collage.jpg';
       link.href = dataURL;
-      link.click();
-    }
-
-    async function exportAnimatedVideo() {
-      canvas.discardActiveObject();
-      canvas.renderAll();
-
-      const duration = parseInt(document.getElementById('videoDuration').value) || 5;
-      const animStyle = document.getElementById('animationStyle').value;
-      const fps = 25;
-      const totalFrames = duration * fps;
-      const statusElement = document.getElementById('statusLog');
-      
-      statusElement.innerText = "Encoding canvas elements to video stream...";
-
-      const captureCanvas = document.getElementById('collageCanvas');
-      const stream = captureCanvas.captureStream(fps);
-      
-      let mediaRecorder;
-      let recordedChunks = [];
-      let audioDest = null;
-      let audioSource = null;
-
-      if (selectedAudioBuffer && audioContext) {
-        audioDest = audioCo
+      l
