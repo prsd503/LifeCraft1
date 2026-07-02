@@ -298,7 +298,7 @@
       </div>
     </div>
 
-    <!-- 2. RE-RESTORED ANIMATION EXPORTER INTERFACE CARD -->
+    <!-- VIDEO EXPORTER SECTION CARD -->
     <div class="card">
       <h3>🎞️ Video & Animation Exporter</h3>
       
@@ -330,6 +330,7 @@
     </div>
   </div>
 
+  <!-- ALL JAVASCRIPT GLOBAL ATTRIBUTIONS DEFINED IN SAFE LAYOUT WINDOW ORDER -->
   <script>
     let canvas;
     let uploadedImages = [];
@@ -338,46 +339,7 @@
     let selectedAudioBuffer = null;
     let audioContext = null;
 
-    window.addEventListener('load', () => {
-      const debugBox = document.getElementById('runtimeDebugLog');
-      try {
-        if (typeof fabric === 'undefined') {
-          debugBox.style.background = '#ffebee';
-          debugBox.style.color = '#c62828';
-          throw new Error("Fabric.js missing! The browser blocked the connection script.");
-        }
-
-        canvas = new fabric.Canvas('collageCanvas', {
-          width: 360,
-          height: 360,
-          backgroundColor: '#ffffff',
-          preserveObjectStacking: true
-        });
-        
-        canvas.calcOffset();
-
-        canvas.on('selection:created', onObjectSelected);
-        canvas.on('selection:updated', onObjectSelected);
-        canvas.on('selection:cleared', () => {
-          document.getElementById('transformControls').style.display = 'none';
-        });
-
-        canvas.renderAll();
-
-        debugBox.style.background = '#e8f5e9';
-        debugBox.style.color = '#2e7d32';
-        debugBox.style.borderColor = '#81c784';
-        debugBox.innerHTML = "✅ <b>Success:</b> Fabric.js engine running and active!";
-        
-        setTimeout(() => { debugBox.style.display = 'none'; }, 3000);
-
-      } catch (err) {
-        debugBox.style.background = '#ffebee';
-        debugBox.style.color = '#c62828';
-        debugBox.innerHTML = `<div>❌ <b>Init Crash:</b> ${err.message}</div>`;
-      }
-    });
-
+    // Global scopes declared early to bypass initialization inline click limits
     function onObjectSelected(e) {
       if (e.target && e.target.type === 'image') {
         document.getElementById('transformControls').style.display = 'block';
@@ -387,18 +349,6 @@
         document.getElementById('transformControls').style.display = 'none';
       }
     }
-
-    document.getElementById('angleSlider').addEventListener('input', function() {
-      if(!canvas) return;
-      let active = canvas.getActiveObject();
-      if (active) { active.set('angle', parseInt(this.value)).setCoords(); canvas.renderAll(); }
-    });
-
-    document.getElementById('scaleSlider').addEventListener('input', function() {
-      if(!canvas) return;
-      let active = canvas.getActiveObject();
-      if (active) { active.scale(parseFloat(this.value)).setCoords(); canvas.renderAll(); }
-    });
 
     function deleteSelectedObj() {
       if(!canvas) return;
@@ -413,11 +363,12 @@
     }
 
     function clearAllImages() {
-      if (!canvas || uploadedImages.length === 0) return;
-      uploadedImages.forEach(img => canvas.remove(img));
+      if (!canvas) return;
+      canvas.clear();
+      canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
       uploadedImages = [];
-      canvas.discardActiveObject();
-      canvas.renderAll();
+      if(textObject) textObject = null;
+      if(borderFrame) borderFrame = null;
       document.getElementById('statusLog').innerText = "Cleared all photos!";
     }
 
@@ -447,25 +398,6 @@
         reader.readAsDataURL(files[i]);
       }
     }
-
-    document.getElementById('cameraLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
-    document.getElementById('galleryLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
-
-    document.getElementById('audioLoader').addEventListener('change', function(e) {
-      const file = e.target.files[0];
-      if (file) {
-        document.getElementById('audioName').style.display = 'block';
-        document.getElementById('audioName').innerText = `🎵 Track: ${file.name.substring(0, 25)}`;
-        const reader = new FileReader();
-        reader.onload = function(evt) {
-          audioContext = new (window.AudioContext || window.webkitAudioContext)();
-          audioContext.decodeAudioData(evt.target.result, function(buffer) {
-            selectedAudioBuffer = buffer;
-          });
-        };
-        reader.readAsArrayBuffer(file);
-      }
-    });
 
     function arrangeLayerOrder() {
       if(!canvas) return;
@@ -575,4 +507,73 @@
       if (textObject) {
         textObject.set(textOptions);
         textObject.set('text', textVal);
-    
+      } else {
+        textOptions.top = canvas.height - 35;
+        textOptions.originY = 'center';
+        textObject = new fabric.Text(textVal, textOptions);
+        canvas.add(textObject);
+      }
+      arrangeLayerOrder();
+    }
+
+    function downloadCollageImage() {
+      if(!canvas) return;
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      const dataURL = canvas.toDataURL({ format: 'jpeg', quality: 0.95 });
+      const link = document.createElement('a');
+      link.download = 'lifecraft-collage.jpg';
+      link.href = dataURL;
+      link.click();
+    }
+
+    async function exportAnimatedVideo() {
+      if(!canvas || uploadedImages.length === 0) {
+        alert("Please import at least one photo before generating video transformations.");
+        return;
+      }
+      canvas.discardActiveObject();
+      canvas.renderAll();
+
+      const duration = parseInt(document.getElementById('videoDuration').value) || 5;
+      const animStyle = document.getElementById('animationStyle').value;
+      const fps = 25;
+      const totalFrames = duration * fps;
+      const statusElement = document.getElementById('statusLog');
+      
+      statusElement.innerText = "Encoding canvas elements to video stream...";
+
+      const captureCanvas = document.getElementById('collageCanvas');
+      const stream = captureCanvas.captureStream(fps);
+      
+      let mediaRecorder;
+      let recordedChunks = [];
+      let audioDest = null;
+      let audioSource = null;
+
+      if (selectedAudioBuffer && audioContext) {
+        audioDest = audioContext.createMediaStreamDestination();
+        audioSource = audioContext.createBufferSource();
+        audioSource.buffer = selectedAudioBuffer;
+        audioSource.loop = true;
+        audioSource.connect(audioDest);
+        stream.addTrack(audioDest.stream.getAudioTracks()[0]);
+      }
+
+      let options = { mimeType: 'video/webm;codecs=vp9' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm;codecs=vp8' };
+      if (!MediaRecorder.isTypeSupported(options.mimeType)) options = { mimeType: 'video/webm' };
+
+      try {
+        mediaRecorder = new MediaRecorder(stream, options);
+      } catch (err) {
+        statusElement.innerText = "Video encoding failure on this browser platform.";
+        return;
+      }
+
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) recordedChunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        const blob = new Blob(recordedChunks, { type: 'video/mp4' });
+        const link = document.createElement('a');
+        link.download = 'lifecraft-video.mp4';
+        link.href = URL.crea
