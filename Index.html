@@ -1,0 +1,612 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>LifeCraft - Collage & Video Creator</title>
+  <link rel="manifest" href="manifest.json">
+  <!-- Google Fonts for stylish event options -->
+  <link href="https://fonts.googleapis.com/css2?family=Caveat:wght@700&family=Cinzel:wght@700&family=Fredoka+One&family=Montserrat:wght@700&display=swap" rel="stylesheet">
+  <!-- Fabric.js handles object scaling, rotation, and layers -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
+  <style>
+    :root {
+      --primary: #FF6B6B;
+      --secondary: #4ECDC4;
+      --accent: #FFE66D;
+      --dark: #2F2F2F;
+      --light: #F7FFF7;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: 'Segoe UI', Roboto, sans-serif;
+      -webkit-tap-highlight-color: transparent;
+    }
+
+    body {
+      background: linear-gradient(135deg, #f5f7fa 0%, #c3cfe2 100%);
+      color: var(--dark);
+      min-height: 100vh;
+      padding-bottom: 30px;
+    }
+
+    header {
+      background: linear-gradient(45deg, var(--primary), var(--secondary));
+      color: white;
+      padding: 15px;
+      text-align: center;
+      box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+      border-bottom-left-radius: 20px;
+      border-bottom-right-radius: 20px;
+    }
+
+    header h1 {
+      font-size: 1.8rem;
+      letter-spacing: 1px;
+    }
+
+    .container {
+      max-width: 500px;
+      margin: 0 auto;
+      padding: 15px;
+    }
+
+    .card {
+      background: white;
+      border-radius: 16px;
+      padding: 15px;
+      margin-bottom: 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+    }
+
+    h3 {
+      margin-bottom: 12px;
+      font-size: 1.1rem;
+      color: var(--dark);
+      border-left: 4px solid var(--primary);
+      padding-left: 8px;
+    }
+
+    .canvas-container-wrapper {
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      background: #eef1f6;
+      border-radius: 12px;
+      overflow: hidden;
+      margin-bottom: 15px;
+      border: 3px dashed var(--secondary);
+    }
+
+    .control-group {
+      margin-bottom: 15px;
+    }
+
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 6px;
+      font-size: 0.9rem;
+      color: #555;
+    }
+
+    select, input[type="text"], input[type="number"] {
+      width: 100%;
+      padding: 10px;
+      border: 2px solid #e0e0e0;
+      border-radius: 8px;
+      font-size: 0.95rem;
+      outline: none;
+    }
+
+    select:focus, input:focus {
+      border-color: var(--secondary);
+    }
+
+    .grid-buttons {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 10px;
+      margin-bottom: 15px;
+    }
+
+    .btn {
+      background: var(--primary);
+      color: white;
+      border: none;
+      padding: 12px 15px;
+      border-radius: 10px;
+      font-weight: bold;
+      font-size: 0.95rem;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+    }
+
+    .btn:active {
+      transform: scale(0.98);
+    }
+
+    .btn-secondary {
+      background: var(--secondary);
+    }
+
+    .btn-accent {
+      background: #ffb900;
+      color: var(--dark);
+    }
+
+    .btn-danger {
+      background: #e74c3c;
+    }
+
+    .hidden-input {
+      display: none;
+    }
+
+    .transform-controls {
+      background: #f9f9f9;
+      padding: 12px;
+      border-radius: 10px;
+      margin-top: 10px;
+      display: none;
+      border: 1px solid #e0e0e0;
+    }
+
+    .range-flex {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      margin-bottom: 8px;
+    }
+
+    .range-flex input {
+      flex: 1;
+    }
+
+    .text-format-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .text-format-bar select {
+      flex: 1;
+      min-width: 120px;
+      height: 40px;
+    }
+
+    .color-picker-wrapper {
+      display: flex;
+      gap: 4px;
+      align-items: center;
+      flex: 1;
+    }
+
+    .color-picker-wrapper input[type="color"] {
+      width: 100%;
+      height: 40px;
+      padding: 2px;
+      border: 1px solid #ccc;
+      border-radius: 6px;
+      cursor: pointer;
+    }
+
+    .status-log {
+      text-align: center;
+      font-size: 0.9rem;
+      font-weight: 600;
+      color: var(--primary);
+      min-height: 20px;
+    }
+  </style>
+</head>
+<body>
+
+  <header>
+    <h1>🎨 LifeCraft</h1>
+  </header>
+
+  <div class="container">
+    <div class="card">
+      <div class="canvas-container-wrapper">
+        <canvas id="collageCanvas" width="360" height="360"></canvas>
+      </div>
+      
+      <div class="status-log" id="statusLog">Capture photos to start!</div>
+
+      <div class="transform-controls" id="transformControls">
+        <label>Selected Photo Tuning:</label>
+        <div class="range-flex">
+          <span>📐 Angle</span>
+          <input type="range" id="angleSlider" min="0" max="360" value="0">
+        </div>
+        <div class="range-flex">
+          <span>🔍 Size</span>
+          <input type="range" id="scaleSlider" min="0.1" max="2" step="0.05" value="1">
+        </div>
+        <button class="btn btn-danger" style="padding:6px 12px; font-size:0.85rem; width: 100%;" onclick="deleteSelectedObj()">🗑️ Remove This Photo</button>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>📸 Import & Layout</h3>
+      <div class="grid-buttons">
+        <button class="btn" onclick="document.getElementById('cameraLoader').click()">📸 Take Photo</button>
+        <button class="btn btn-secondary" onclick="document.getElementById('galleryLoader').click()">🖼️ Open Gallery</button>
+      </div>
+      
+      <input type="file" id="cameraLoader" class="hidden-input" accept="image/*" capture="environment">
+      <input type="file" id="galleryLoader" class="hidden-input" accept="image/*" multiple>
+
+      <div class="grid-buttons">
+        <button class="btn btn-accent" onclick="generateRandomLayout()">🔀 Mix Positions</button>
+        <button class="btn btn-danger" onclick="clearAllImages()">🚨 Reset Canvas</button>
+      </div>
+
+      <div class="control-group">
+        <label for="themeSelect">✨ Select Event Theme</label>
+        <select id="themeSelect" onchange="applyThemeDecoration()">
+          <option value="none">Plain / Minimalist</option>
+          <option value="birthday">🎉 Happy Birthday</option>
+          <option value="anniversary">💖 Anniversary</option>
+          <option value="vacation">🌴 Holiday & Travel</option>
+          <option value="graduation">🎓 Graduation Day</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>✍️ Typography & Banner Styling</h3>
+      <div class="control-group">
+        <label for="customText">Custom Event Text</label>
+        <input type="text" id="customText" placeholder="Type custom message here..." oninput="updateCustomText()">
+        
+        <div class="text-format-bar">
+          <div class="color-picker-wrapper" title="Text Color">
+            <label style="font-size:0.75rem; margin:0;">Text:</label>
+            <input type="color" id="textColor" value="#ffffff" onchange="updateCustomText()">
+          </div>
+
+          <div class="color-picker-wrapper" title="Banner Background Color">
+            <label style="font-size:0.75rem; margin:0;">Bg Banner:</label>
+            <input type="color" id="textBgColor" value="#ff4a75" onchange="updateCustomText()">
+          </div>
+          
+          <select id="fontStyle" onchange="updateCustomText()">
+            <option value="Montserrat">Montserrat (Modern Bold)</option>
+            <option value="Arial">Arial (Clean)</option>
+            <option value="Cinzel">Cinzel (Elegant)</option>
+            <option value="Caveat">Caveat (Handwriting)</option>
+            <option value="Fredoka One">Fredoka (Playful)</option>
+          </select>
+
+          <select id="textAlignment" onchange="updateCustomText()">
+            <option value="center">Align Center</option>
+            <option value="left">Align Left</option>
+            <option value="right">Align Right</option>
+          </select>
+        </div>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>🎞️ Video & Animation Exporter</h3>
+      
+      <div class="control-group">
+        <label for="animationStyle">🎬 Select Entry Animation Effect</label>
+        <select id="animationStyle">
+          <option value="pop">One by One Pop-In (Staggered)</option>
+          <option value="fade">Smooth Fade In (Ensemble)</option>
+          <option value="spin">Spin & Drop Entrance</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>🎵 Optional Background Music</label>
+        <button class="btn btn-secondary" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="document.getElementById('audioLoader').click()">🎵 Pick Audio File</button>
+        <input type="file" id="audioLoader" class="hidden-input" accept="audio/*">
+        <div id="audioName" style="font-size:0.8rem; margin-top:5px; color:#0288d1; display:none;"></div>
+      </div>
+
+      <div class="control-group">
+        <label for="videoDuration">⏱️ Video Duration (Seconds)</label>
+        <input type="number" id="videoDuration" value="5" min="2" max="15">
+      </div>
+
+      <div class="grid-buttons">
+        <button class="btn" onclick="downloadCollageImage()">💾 Save Image (JPG)</button>
+        <button class="btn btn-accent" onclick="exportAnimatedVideo()">🎬 Export Video (MP4)</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const canvas = new fabric.Canvas('collageCanvas', {
+      backgroundColor: '#ffffff',
+      preserveObjectStacking: true
+    });
+
+    let uploadedImages = [];
+    let borderFrame = null;
+    let textObject = null;
+    let selectedAudioBuffer = null;
+    let audioContext = null;
+
+    canvas.on('selection:created', onObjectSelected);
+    canvas.on('selection:updated', onObjectSelected);
+    canvas.on('selection:cleared', () => {
+      document.getElementById('transformControls').style.display = 'none';
+    });
+
+    function onObjectSelected(e) {
+      if (e.target && e.target.type === 'image') {
+        document.getElementById('transformControls').style.display = 'block';
+        document.getElementById('angleSlider').value = Math.round(e.target.angle || 0);
+        document.getElementById('scaleSlider').value = e.target.scaleX || 1;
+      } else {
+        document.getElementById('transformControls').style.display = 'none';
+      }
+    }
+
+    document.getElementById('angleSlider').addEventListener('input', function() {
+      let active = canvas.getActiveObject();
+      if (active) { active.set('angle', parseInt(this.value)).setCoords(); canvas.renderAll(); }
+    });
+
+    document.getElementById('scaleSlider').addEventListener('input', function() {
+      let active = canvas.getActiveObject();
+      if (active) { active.scale(parseFloat(this.value)).setCoords(); canvas.renderAll(); }
+    });
+
+    function deleteSelectedObj() {
+      let active = canvas.getActiveObject();
+      if (active) {
+        uploadedImages = uploadedImages.filter(img => img !== active);
+        canvas.remove(active);
+        canvas.discardActiveObject();
+        canvas.renderAll();
+        document.getElementById('statusLog').innerText = "Removed selected photo.";
+      }
+    }
+
+    function clearAllImages() {
+      if (uploadedImages.length === 0) return;
+      uploadedImages.forEach(img => canvas.remove(img));
+      uploadedImages = [];
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      document.getElementById('statusLog').innerText = "Cleared all photos from layout!";
+    }
+
+    // FIXED: Uses fabric.Image.fromURL structure to avoid live HTTPS sandbox blocks on GitHub Pages
+    function handleImageFiles(files) {
+      if(!files.length) return;
+      
+      for (let i = 0; i < files.length; i++) {
+        const reader = new FileReader();
+        reader.onload = function(event) {
+          const dataUrl = event.target.result;
+          
+          fabric.Image.fromURL(dataUrl, function(fabricImg) {
+            fabricImg.set({
+              left: 40 + (uploadedImages.length * 30) % 140,
+              top: 40 + (uploadedImages.length * 30) % 140,
+              cornerColor: '#4ECDC4',
+              cornerSize: 24,
+              transparentCorners: false,
+              hasRotatingPoint: false
+            });
+            fabricImg.scaleToWidth(140);
+            canvas.add(fabricImg);
+            uploadedImages.push(fabricImg);
+            
+            arrangeLayerOrder();
+          }, { crossOrigin: 'anonymous' }); // Guarantees security handshake parity over live web-servers
+        };
+        reader.readAsDataURL(files[i]);
+      }
+      document.getElementById('statusLog').innerText = `Loaded ${files.length} photo(s).`;
+    }
+
+    document.getElementById('cameraLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
+    document.getElementById('galleryLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
+
+    document.getElementById('audioLoader').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        document.getElementById('audioName').style.display = 'block';
+        document.getElementById('audioName').innerText = `🎵 Track: ${file.name.substring(0, 25)}`;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          audioContext.decodeAudioData(evt.target.result, function(buffer) {
+            selectedAudioBuffer = buffer;
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    });
+
+    function arrangeLayerOrder() {
+      if (borderFrame) {
+        canvas.sendToBack(borderFrame);
+      }
+      uploadedImages.forEach(img => {
+        canvas.bringToFront(img);
+      });
+      if (textObject) {
+        canvas.bringToFront(textObject);
+      }
+      canvas.renderAll();
+    }
+
+    function generateRandomLayout() {
+      if (uploadedImages.length === 0) return;
+      uploadedImages.forEach((img, index) => {
+        const sliceAngle = (360 / uploadedImages.length) * index;
+        const radian = (sliceAngle * Math.PI) / 180;
+        const targetX = (canvas.width / 2) + Math.cos(radian) * 60 - 70;
+        const targetY = (canvas.height / 2) + Math.sin(radian) * 60 - 90;
+        const randomTilt = Math.floor(Math.random() * 30) - 15;
+
+        img.animate({ left: targetX, top: targetY, angle: randomTilt }, {
+          duration: 500,
+          onChange: canvas.renderAll.bind(canvas),
+          easing: fabric.util.ease.easeOutBack
+        });
+      });
+      setTimeout(arrangeLayerOrder, 550);
+    }
+
+    function applyThemeDecoration() {
+      const theme = document.getElementById('themeSelect').value;
+      if (borderFrame) { canvas.remove(borderFrame); borderFrame = null; }
+
+      let frameColor = 'transparent';
+      let frameStroke = 0;
+
+      switch(theme) {
+        case 'birthday':
+          frameColor = '#FF6B6B';
+          frameStroke = 10;
+          canvas.setBackgroundColor('#FFF9E6', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "HAPPY BIRTHDAY 🎉";
+          document.getElementById('textBgColor').value = "#ff4a75";
+          document.getElementById('textColor').value = "#ffffff";
+          updateCustomText();
+          break;
+        case 'anniversary':
+          frameColor = '#D4AF37';
+          frameStroke = 10;
+          canvas.setBackgroundColor('#FFF0F5', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "HAPPY ANNIVERSARY ❤️";
+          document.getElementById('textBgColor').value = "#D4AF37";
+          document.getElementById('textColor').value = "#ffffff";
+          updateCustomText();
+          break;
+        case 'vacation':
+          frameColor = '#4ECDC4';
+          frameStroke = 10;
+          canvas.setBackgroundColor('#E0F7FA', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "VACATION MEMORIES 🌴";
+          document.getElementById('textBgColor').value = "#4ECDC4";
+          document.getElementById('textColor').value = "#ffffff";
+          updateCustomText();
+          break;
+        case 'graduation':
+          frameColor = '#2C3E50';
+          frameStroke = 10;
+          canvas.setBackgroundColor('#ECEFF1', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "CLASS OF 2026 🎓";
+          document.getElementById('textBgColor').value = "#2C3E50";
+          document.getElementById('textColor').value = "#ffffff";
+          updateCustomText();
+          break;
+        default:
+          canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+          break;
+      }
+
+      if (frameStroke > 0) {
+        borderFrame = new fabric.Rect({
+          left: frameStroke/2,
+          top: frameStroke/2,
+          width: canvas.width - frameStroke,
+          height: canvas.height - frameStroke,
+          fill: 'transparent',
+          stroke: frameColor,
+          strokeWidth: frameStroke,
+          selectable: false,
+          evented: false
+        });
+        canvas.add(borderFrame);
+      }
+      arrangeLayerOrder();
+    }
+
+    function updateCustomText() {
+      const textVal = document.getElementById('customText').value;
+      const colorVal = document.getElementById('textColor').value;
+      const bgBarColorVal = document.getElementById('textBgColor').value;
+      const fontVal = document.getElementById('fontStyle').value;
+      const alignVal = document.getElementById('textAlignment').value;
+
+      if (!textVal) {
+        if (textObject) { canvas.remove(textObject); textObject = null; }
+        canvas.renderAll();
+        return;
+      }
+
+      let textOptions = {
+        text: textVal,
+        fill: colorVal,
+        textBackgroundColor: bgBarColorVal,
+        fontFamily: fontVal,
+        textAlign: alignVal,
+        fontSize: 20,
+        fontWeight: 'bold',
+        selectable: true
+      };
+
+      if (alignVal === 'left') {
+        textOptions.left = 20;
+        textOptions.originX = 'left';
+      } else if (alignVal === 'right') {
+        textOptions.left = canvas.width - 20;
+        textOptions.originX = 'right';
+      } else {
+        textOptions.left = canvas.width / 2;
+        textOptions.originX = 'center';
+      }
+
+      if (textObject) {
+        textObject.set(textOptions);
+      } else {
+        textOptions.top = canvas.height - 35;
+        textOptions.originY = 'center';
+        textObject = new fabric.Text(textVal, textOptions);
+        canvas.add(textObject);
+      }
+      arrangeLayerOrder();
+    }
+
+    function downloadCollageImage() {
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      const dataURL = canvas.toDataURL({ format: 'jpeg', quality: 0.95 });
+      const link = document.createElement('a');
+      link.download = 'lifecraft-collage.jpg';
+      link.href = dataURL;
+      link.click();
+    }
+
+    async function exportAnimatedVideo() {
+      canvas.discardActiveObject();
+      canvas.renderAll();
+
+      const duration = parseInt(document.getElementById('videoDuration').value) || 5;
+      const animStyle = document.getElementById('animationStyle').value;
+      const fps = 25;
+      const totalFrames = duration * fps;
+      const statusElement = document.getElementById('statusLog');
+      
+      statusElement.innerText = "Encoding canvas elements to video stream...";
+
+      const captureCanvas = document.getElementById('collageCanvas');
+      const stream = captureCanvas.captureStream(fps);
+      
+      let mediaRecorder;
+      let recordedChunks = [];
+      let audioDest = null;
+      let audioSource = null;
+
+      if (selectedAudioBuffer && audioContext) {
+        audioDest = audioCo
