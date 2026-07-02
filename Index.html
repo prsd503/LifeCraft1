@@ -210,7 +210,7 @@
 <body>
 
   <header>
-    <h1>🎨 LifeCraft</h1>
+    <h1>🎨 LifeCraft1</h1>
   </header>
 
   <div id="runtimeDebugLog">
@@ -298,7 +298,7 @@
       </div>
     </div>
 
-    <!-- VIDEO EXPORTER SECTION CARD -->
+    <!-- VIDEO ANIMATION CONTAINER CARD -->
     <div class="card">
       <h3>🎞️ Video & Animation Exporter</h3>
       
@@ -324,13 +324,12 @@
       </div>
 
       <div class="grid-buttons">
-        <button class="btn" onclick="downloadCollageImage()">💾 Save Image (JPG)</button>
+        <button claclaLifeCraft1onclickonclick="downloadCollageImage()">💾 Save Image (JPG)</button>
         <button class="btn btn-accent" onclick="exportAnimatedVideo()">🎬 Export Video (MP4)</button>
       </div>
     </div>
   </div>
 
-  <!-- ALL JAVASCRIPT GLOBAL ATTRIBUTIONS DEFINED IN SAFE LAYOUT WINDOW ORDER -->
   <script>
     let canvas;
     let uploadedImages = [];
@@ -339,7 +338,6 @@
     let selectedAudioBuffer = null;
     let audioContext = null;
 
-    // Global scopes declared early to bypass initialization inline click limits
     function onObjectSelected(e) {
       if (e.target && e.target.type === 'image') {
         document.getElementById('transformControls').style.display = 'block';
@@ -367,18 +365,24 @@
       canvas.clear();
       canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
       uploadedImages = [];
-      if(textObject) textObject = null;
-      if(borderFrame) borderFrame = null;
+      textObject = null;
+      borderFrame = null;
       document.getElementById('statusLog').innerText = "Cleared all photos!";
     }
 
+    // BULLETPROOF SECURE MOBILE IMAGE LOADER
     function handleImageFiles(files) {
       if(!canvas || !files.length) return;
+      document.getElementById('statusLog').innerText = "Processing media layers...";
+      
       for (let i = 0; i < files.length; i++) {
         const reader = new FileReader();
         reader.onload = function(event) {
-          const imgElement = new Image();
-          imgElement.onload = function() {
+          fabric.util.loadImage(event.target.result, function(imgElement) {
+            if (!imgElement) {
+              document.getElementById('statusLog').innerText = "⚠️ Image decoding fault.";
+              return;
+            }
             const fabricImg = new fabric.Image(imgElement, {
               left: 40 + (uploadedImages.length * 30) % 140,
               top: 40 + (uploadedImages.length * 30) % 140,
@@ -392,8 +396,8 @@
             uploadedImages.push(fabricImg);
             arrangeLayerOrder();
             canvas.renderAll();
-          };
-          imgElement.src = event.target.result;
+            document.getElementById('statusLog').innerText = "Photos successfully loaded!";
+          });
         };
         reader.readAsDataURL(files[i]);
       }
@@ -576,4 +580,137 @@
         const blob = new Blob(recordedChunks, { type: 'video/mp4' });
         const link = document.createElement('a');
         link.download = 'lifecraft-video.mp4';
-        link.href = URL.crea
+        link.href = URL.createObjectURL(blob);
+        link.click();
+        statusElement.innerText = "✅ Video Download Complete!";
+        if (audioSource) { try { audioSource.stop(); } catch(e){} }
+        uploadedImages.forEach(img => img.set({ opacity: 1 }));
+        canvas.renderAll();
+      };
+
+      const initialPositions = uploadedImages.map(img => ({
+        obj: img, origScaleX: img.scaleX, origScaleY: img.scaleY, origAngle: img.angle
+      }));
+
+      mediaRecorder.start();
+      if (audioSource) audioSource.start(0);
+
+      let currentFrame = 0;
+
+      function renderFrameLoop() {
+        if (currentFrame >= totalFrames) {
+          mediaRecorder.stop();
+          return;
+        }
+
+        const progress = currentFrame / totalFrames;
+
+        initialPositions.forEach((item, index) => {
+          if (animStyle === 'pop') {
+            const triggerProgress = index / initialPositions.length;
+            if (progress >= triggerProgress) {
+              const localProgress = Math.min(1, (progress - triggerProgress) / (1 - triggerProgress) * 2);
+              item.obj.set({ opacity: 1, scaleX: item.origScaleX * localProgress, scaleY: item.origScaleY * localProgress });
+            } else {
+              item.obj.set({ opacity: 0 });
+            }
+          } 
+          else if (animStyle === 'fade') {
+            const fadeProgress = Math.min(1, progress * 2);
+            item.obj.set({ opacity: fadeProgress });
+          } 
+          else if (animStyle === 'spin') {
+            const spinProgress = Math.min(1, progress * 1.5);
+            item.obj.set({
+              opacity: spinProgress,
+              angle: item.origAngle + ((1 - spinProgress) * 180),
+              scaleX: item.origScaleX * spinProgress,
+              scaleY: item.origScaleY * spinProgress
+            });
+          }
+        });
+
+        canvas.renderAll();
+        currentFrame++;
+        statusElement.innerText = `Rendering Progress: ${Math.round(progress * 100)}%`;
+        requestAnimationFrame(renderFrameLoop);
+      }
+
+      uploadedImages.forEach(img => img.set({ opacity: 0 }));
+      canvas.renderAll();
+
+      setTimeout(renderFrameLoop, 300);
+    }
+
+    // MAIN LOAD INITIALIZER
+    window.addEventListener('load', () => {
+      const debugBox = document.getElementById('runtimeDebugLog');
+      try {
+        if (typeof fabric === 'undefined') {
+          throw new Error("Fabric.js script missing or broken from host connection link.");
+        }
+
+        canvas = new fabric.Canvas('collageCanvas', {
+          width: 360,
+          height: 360,
+          backgroundColor: '#ffffff',
+          preserveObjectStacking: true
+        });
+        
+        canvas.calcOffset();
+
+        canvas.on('selection:created', onObjectSelected);
+        canvas.on('selection:updated', onObjectSelected);
+        canvas.on('selection:cleared', () => {
+          document.getElementById('transformControls').style.display = 'none';
+        });
+
+        document.getElementById('angleSlider').addEventListener('input', function() {
+          if(!canvas) return;
+          let active = canvas.getActiveObject();
+          if (active) { active.set('angle', parseInt(this.value)).setCoords(); canvas.renderAll(); }
+        });
+
+        document.getElementById('scaleSlider').addEventListener('input', function() {
+          if(!canvas) return;
+          let active = canvas.getActiveObject();
+          if (active) { active.scale(parseFloat(this.value)).setCoords(); canvas.renderAll(); }
+        });
+
+        document.getElementById('cameraLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
+        document.getElementById('galleryLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
+
+        document.getElementById('audioLoader').addEventListener('change', function(e) {
+          const file = e.target.files[0];
+          if (file) {
+            document.getElementById('audioName').style.display = 'block';
+            document.getElementById('audioName').innerText = `🎵 Track: ${file.name.substring(0, 25)}`;
+            const reader = new FileReader();
+            reader.onload = function(evt) {
+              audioContext = new (window.AudioContext || window.webkitAudioContext)();
+              audioContext.decodeAudioData(evt.target.result, function(buffer) {
+                selectedAudioBuffer = buffer;
+              });
+            };
+            reader.readAsArrayBuffer(file);
+          }
+        });
+
+        canvas.renderAll();
+
+        debugBox.style.background = '#e8f5e9';
+        debugBox.style.color = '#2e7d32';
+        debugBox.style.borderColor = '#81c784';
+        debugBox.innerHTML = "✅ <b>Success:</b> Fabric.js runtime initialized and active functions fully mapped!";
+        
+        setTimeout(() => { debugBox.style.display = 'none'; }, 3000);
+
+      } catch (err) {
+        debugBox.style.background = '#ffebee';
+        debugBox.style.color = '#c62828';
+        debugBox.innerHTML = `<div>❌ <b>Init Crash:</b> ${err.message}</div>`;
+      }
+    });
+  </script>
+</body>
+</html>
