@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>LifeCraft - Collage & Video Creator</title>
   
-  <!-- 1. BULLETPROOF CACHING & RESOURCE ERROR TRACKER -->
+  <!-- 1. LIVE ERROR TRACKING HEADSCRIPT -->
   <script>
-    // 'true' at the end enables a capturing listener to catch failed script tags (like blocked CDNs)
     window.addEventListener('error', function(e) {
       const debugBox = document.getElementById('runtimeDebugLog');
       if (debugBox) {
@@ -33,7 +32,7 @@
   <!-- Google Fonts -->
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght=700&family=Cinzel:wght=700&family=Fredoka+One&family=Montserrat:wght=700&display=swap" rel="stylesheet">
   
-  <!-- FALLBACK DESIGN: If CDN fails, we initialize securely -->
+  <!-- SECURE HTTPS CDN FOR FABRIC.JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
   <style>
@@ -65,7 +64,6 @@
       text-align: center;
     }
 
-    /* DEBUG BOX - INSANELY VISIBLE FORCED BACKUP LAYOUT */
     #runtimeDebugLog {
       background: #fff3e0;
       color: #e65100;
@@ -76,7 +74,7 @@
       border-radius: 8px;
       font-family: monospace;
       font-size: 0.9rem;
-      display: block; /* Forced open by default to show status immediately! */
+      display: block;
     }
 
     .container {
@@ -100,7 +98,6 @@
       padding-left: 8px;
     }
 
-    /* HARDWARE FIXED WIDTH LOCKS */
     .canvas-container-wrapper {
       display: block;
       width: 360px !important;
@@ -216,7 +213,6 @@
     <h1>🎨 LifeCraft</h1>
   </header>
 
-  <!-- This panel starts visible now to guarantee you know the script layout engine is alive -->
   <div id="runtimeDebugLog">
     ⚙️ <b>System Diagnostics Panel:</b> Waiting for page lifecycle load...
   </div>
@@ -302,8 +298,31 @@
       </div>
     </div>
 
+    <!-- 2. RE-RESTORED ANIMATION EXPORTER INTERFACE CARD -->
     <div class="card">
-      <h3>🎞️ Exporter</h3>
+      <h3>🎞️ Video & Animation Exporter</h3>
+      
+      <div class="control-group">
+        <label for="animationStyle">🎬 Select Entry Animation Effect</label>
+        <select id="animationStyle">
+          <option value="pop">One by One Pop-In (Staggered)</option>
+          <option value="fade">Smooth Fade In (Ensemble)</option>
+          <option value="spin">Spin & Drop Entrance</option>
+        </select>
+      </div>
+
+      <div class="control-group">
+        <label>🎵 Optional Background Music</label>
+        <button class="btn btn-secondary" style="width:auto; padding:6px 12px; font-size:0.85rem;" onclick="document.getElementById('audioLoader').click()">🎵 Pick Audio File</button>
+        <input type="file" id="audioLoader" class="hidden-input" accept="audio/*">
+        <div id="audioName" style="font-size:0.8rem; margin-top:5px; color:#0288d1; display:none;"></div>
+      </div>
+
+      <div class="control-group">
+        <label for="videoDuration">⏱️ Video Duration (Seconds)</label>
+        <input type="number" id="videoDuration" value="5" min="2" max="15">
+      </div>
+
       <div class="grid-buttons">
         <button class="btn" onclick="downloadCollageImage()">💾 Save Image (JPG)</button>
         <button class="btn btn-accent" onclick="exportAnimatedVideo()">🎬 Export Video (MP4)</button>
@@ -316,6 +335,8 @@
     let uploadedImages = [];
     let borderFrame = null;
     let textObject = null;
+    let selectedAudioBuffer = null;
+    let audioContext = null;
 
     window.addEventListener('load', () => {
       const debugBox = document.getElementById('runtimeDebugLog');
@@ -323,7 +344,7 @@
         if (typeof fabric === 'undefined') {
           debugBox.style.background = '#ffebee';
           debugBox.style.color = '#c62828';
-          throw new Error("Fabric.js completely missing! The browser blocked the CDN connection script.");
+          throw new Error("Fabric.js missing! The browser blocked the connection script.");
         }
 
         canvas = new fabric.Canvas('collageCanvas', {
@@ -334,15 +355,21 @@
         });
         
         canvas.calcOffset();
+
+        canvas.on('selection:created', onObjectSelected);
+        canvas.on('selection:updated', onObjectSelected);
+        canvas.on('selection:cleared', () => {
+          document.getElementById('transformControls').style.display = 'none';
+        });
+
         canvas.renderAll();
 
-        // If successful, minimize diagnostic presence
         debugBox.style.background = '#e8f5e9';
         debugBox.style.color = '#2e7d32';
         debugBox.style.borderColor = '#81c784';
-        debugBox.innerHTML = "✅ <b>Success:</b> Fabric.js engine is running and layout coordinates are locked!";
+        debugBox.innerHTML = "✅ <b>Success:</b> Fabric.js engine running and active!";
         
-        setTimeout(() => { debugBox.style.display = 'none'; }, 4000);
+        setTimeout(() => { debugBox.style.display = 'none'; }, 3000);
 
       } catch (err) {
         debugBox.style.background = '#ffebee';
@@ -351,31 +378,201 @@
       }
     });
 
-    // RE-INJECTED ESSENTIAL HANDLERS PREVENTING EXECUTION CRASHES
+    function onObjectSelected(e) {
+      if (e.target && e.target.type === 'image') {
+        document.getElementById('transformControls').style.display = 'block';
+        document.getElementById('angleSlider').value = Math.round(e.target.angle || 0);
+        document.getElementById('scaleSlider').value = e.target.scaleX || 1;
+      } else {
+        document.getElementById('transformControls').style.display = 'none';
+      }
+    }
+
+    document.getElementById('angleSlider').addEventListener('input', function() {
+      if(!canvas) return;
+      let active = canvas.getActiveObject();
+      if (active) { active.set('angle', parseInt(this.value)).setCoords(); canvas.renderAll(); }
+    });
+
+    document.getElementById('scaleSlider').addEventListener('input', function() {
+      if(!canvas) return;
+      let active = canvas.getActiveObject();
+      if (active) { active.scale(parseFloat(this.value)).setCoords(); canvas.renderAll(); }
+    });
+
+    function deleteSelectedObj() {
+      if(!canvas) return;
+      let active = canvas.getActiveObject();
+      if (active) {
+        uploadedImages = uploadedImages.filter(img => img !== active);
+        canvas.remove(active);
+        canvas.discardActiveObject();
+        canvas.renderAll();
+        document.getElementById('statusLog').innerText = "Removed selected photo.";
+      }
+    }
+
+    function clearAllImages() {
+      if (!canvas || uploadedImages.length === 0) return;
+      uploadedImages.forEach(img => canvas.remove(img));
+      uploadedImages = [];
+      canvas.discardActiveObject();
+      canvas.renderAll();
+      document.getElementById('statusLog').innerText = "Cleared all photos!";
+    }
+
     function handleImageFiles(files) {
       if(!canvas || !files.length) return;
       for (let i = 0; i < files.length; i++) {
         const reader = new FileReader();
-        reader.onload = function(e) {
+        reader.onload = function(event) {
           const imgElement = new Image();
           imgElement.onload = function() {
             const fabricImg = new fabric.Image(imgElement, {
-              left: 50, top: 50, cornerColor: '#4ECDC4', cornerSize: 24
+              left: 40 + (uploadedImages.length * 30) % 140,
+              top: 40 + (uploadedImages.length * 30) % 140,
+              cornerColor: '#4ECDC4',
+              cornerSize: 24,
+              transparentCorners: false,
+              hasRotatingPoint: false
             });
             fabricImg.scaleToWidth(140);
             canvas.add(fabricImg);
             uploadedImages.push(fabricImg);
+            arrangeLayerOrder();
             canvas.renderAll();
           };
-          imgElement.src = e.target.result;
+          imgElement.src = event.target.result;
         };
         reader.readAsDataURL(files[i]);
       }
     }
+
     document.getElementById('cameraLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
     document.getElementById('galleryLoader').addEventListener('change', function(e) { handleImageFiles(e.target.files); });
-    function clearAllImages() { if(canvas) { canvas.clear(); canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas)); uploadedImages=[]; } }
-    function downloadCollageImage() { if(!canvas) return; const url = canvas.toDataURL({format:'jpeg'}); const a = document.createElement('a'); a.download='collage.jpg'; a.href=url; a.click(); }
-  </script>
-</body>
-</html>
+
+    document.getElementById('audioLoader').addEventListener('change', function(e) {
+      const file = e.target.files[0];
+      if (file) {
+        document.getElementById('audioName').style.display = 'block';
+        document.getElementById('audioName').innerText = `🎵 Track: ${file.name.substring(0, 25)}`;
+        const reader = new FileReader();
+        reader.onload = function(evt) {
+          audioContext = new (window.AudioContext || window.webkitAudioContext)();
+          audioContext.decodeAudioData(evt.target.result, function(buffer) {
+            selectedAudioBuffer = buffer;
+          });
+        };
+        reader.readAsArrayBuffer(file);
+      }
+    });
+
+    function arrangeLayerOrder() {
+      if(!canvas) return;
+      if (borderFrame) canvas.sendToBack(borderFrame);
+      uploadedImages.forEach(img => canvas.bringToFront(img));
+      if (textObject) canvas.bringToFront(textObject);
+      canvas.renderAll();
+    }
+
+    function generateRandomLayout() {
+      if (!canvas || uploadedImages.length === 0) return;
+      uploadedImages.forEach((img, index) => {
+        const sliceAngle = (360 / uploadedImages.length) * index;
+        const radian = (sliceAngle * Math.PI) / 180;
+        const targetX = (canvas.width / 2) + Math.cos(radian) * 60 - 70;
+        const targetY = (canvas.height / 2) + Math.sin(radian) * 60 - 90;
+        const randomTilt = Math.floor(Math.random() * 30) - 15;
+
+        img.animate('left', targetX, { duration: 400, onChange: canvas.renderAll.bind(canvas) });
+        img.animate('top', targetY, { duration: 400, onChange: canvas.renderAll.bind(canvas) });
+        img.animate('angle', randomTilt, {
+          duration: 400,
+          onChange: canvas.renderAll.bind(canvas),
+          easing: fabric.util.ease.easeOutBack
+        });
+      });
+      setTimeout(arrangeLayerOrder, 450);
+    }
+
+    function applyThemeDecoration() {
+      if(!canvas) return;
+      const theme = document.getElementById('themeSelect').value;
+      if (borderFrame) { canvas.remove(borderFrame); borderFrame = null; }
+
+      let frameColor = 'transparent';
+      let frameStroke = 0;
+
+      switch(theme) {
+        case 'birthday':
+          frameColor = '#FF6B6B'; frameStroke = 10;
+          canvas.setBackgroundColor('#FFF9E6', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "HAPPY BIRTHDAY 🎉";
+          document.getElementById('textBgColor').value = "#ff4a75";
+          document.getElementById('textColor').value = "#ffffff";
+          break;
+        case 'anniversary':
+          frameColor = '#D4AF37'; frameStroke = 10;
+          canvas.setBackgroundColor('#FFF0F5', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "HAPPY ANNIVERSARY ❤️";
+          document.getElementById('textBgColor').value = "#D4AF37";
+          document.getElementById('textColor').value = "#ffffff";
+          break;
+        case 'vacation':
+          frameColor = '#4ECDC4'; frameStroke = 10;
+          canvas.setBackgroundColor('#E0F7FA', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "VACATION MEMORIES 🌴";
+          document.getElementById('textBgColor').value = "#4ECDC4";
+          document.getElementById('textColor').value = "#ffffff";
+          break;
+        case 'graduation':
+          frameColor = '#2C3E50'; frameStroke = 10;
+          canvas.setBackgroundColor('#ECEFF1', canvas.renderAll.bind(canvas));
+          document.getElementById('customText').value = "CLASS OF 2026 🎓";
+          document.getElementById('textBgColor').value = "#2C3E50";
+          document.getElementById('textColor').value = "#ffffff";
+          break;
+        default:
+          canvas.setBackgroundColor('#ffffff', canvas.renderAll.bind(canvas));
+          break;
+      }
+
+      if (frameStroke > 0) {
+        borderFrame = new fabric.Rect({
+          left: frameStroke/2, top: frameStroke/2,
+          width: canvas.width - frameStroke, height: canvas.height - frameStroke,
+          fill: 'transparent', stroke: frameColor, strokeWidth: frameStroke,
+          selectable: false, evented: false
+        });
+        canvas.add(borderFrame);
+      }
+      updateCustomText();
+    }
+
+    function updateCustomText() {
+      if(!canvas) return;
+      const textVal = document.getElementById('customText').value;
+      const colorVal = document.getElementById('textColor').value;
+      const bgBarColorVal = document.getElementById('textBgColor').value;
+      const fontVal = document.getElementById('fontStyle').value;
+      const alignVal = document.getElementById('textAlignment').value;
+
+      if (!textVal) {
+        if (textObject) { canvas.remove(textObject); textObject = null; }
+        canvas.renderAll();
+        return;
+      }
+
+      let textOptions = {
+        fill: colorVal, textBackgroundColor: bgBarColorVal, fontFamily: fontVal,
+        textAlign: alignVal, fontSize: 20, fontWeight: 'bold', selectable: true
+      };
+
+      if (alignVal === 'left') { textOptions.left = 20; textOptions.originX = 'left'; }
+      else if (alignVal === 'right') { textOptions.left = canvas.width - 20; textOptions.originX = 'right'; }
+      else { textOptions.left = canvas.width / 2; textOptions.originX = 'center'; }
+
+      if (textObject) {
+        textObject.set(textOptions);
+        textObject.set('text', textVal);
+    
