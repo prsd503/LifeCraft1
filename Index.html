@@ -4,11 +4,29 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>LifeCraft - Collage & Video Creator</title>
-  <link rel="manifest" href="manifest.json">
+  
+  <!-- 1. LIVE ERROR TRACKING HEADSCRIPT: Catch errors immediately as they happen -->
+  <script>
+    window.addEventListener('error', function(e) {
+      const debugBox = document.getElementById('runtimeDebugLog');
+      if (debugBox) {
+        debugBox.style.display = 'block';
+        debugBox.innerHTML += `<div>❌ <b>Error:</b> ${e.message}<br><small>at ${e.filename}:${e.lineno}</small></div>`;
+      }
+    });
+    window.addEventListener('unhandledrejection', function(e) {
+      const debugBox = document.getElementById('runtimeDebugLog');
+      if (debugBox) {
+        debugBox.style.display = 'block';
+        debugBox.innerHTML += `<div>⚠️ <b>Promise Rejected:</b> ${e.reason}</div>`;
+      }
+    });
+  </script>
+
   <!-- Google Fonts for stylish event options -->
   <link href="https://fonts.googleapis.com/css2?family=Caveat:wght=700&family=Cinzel:wght=700&family=Fredoka+One&family=Montserrat:wght=700&display=swap" rel="stylesheet">
   
-  <!-- 1. SECURE HTTPS CDN FOR FABRIC.JS -->
+  <!-- SECURE HTTPS CDN FOR FABRIC.JS -->
   <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.1/fabric.min.js"></script>
 
   <style>
@@ -50,6 +68,22 @@
       letter-spacing: 1px;
     }
 
+    /* 2. LIVE ON-SCREEN DEBUG SYSTEM VISUALS */
+    #runtimeDebugLog {
+      background: #ffebee;
+      color: #c62828;
+      border: 2px solid #ef9a9a;
+      padding: 12px;
+      margin: 10px auto;
+      max-width: 470px;
+      border-radius: 8px;
+      font-family: monospace;
+      font-size: 0.85rem;
+      display: none; /* Only reveals when an error is caught */
+      white-space: pre-wrap;
+      box-shadow: 0 4px 6px rgba(0,0,0,0.05);
+    }
+
     .container {
       max-width: 500px;
       margin: 0 auto;
@@ -72,7 +106,7 @@
       padding-left: 8px;
     }
 
-    /* 2. FIXED LAYOUT BLOCK CONTAINMENT SYSTEM FOR MOBILE BROWSERS */
+    /* FIXED LAYOUT CONTAINMENT SYSTEM FOR MOBILE VIEWPORTS */
     .canvas-container-wrapper {
       display: block;
       width: 360px;
@@ -85,7 +119,7 @@
       position: relative;
     }
 
-    /* Prevents the Fabric container wrapper from flattening inside production viewports */
+    /* Forces Fabric context bounds configuration */
     .canvas-container {
       width: 360px !important;
       height: 360px !important;
@@ -225,6 +259,9 @@
     <h1>🎨 LifeCraft</h1>
   </header>
 
+  <!-- Visual output console panel for deployment runtime crashes -->
+  <div id="runtimeDebugLog"></div>
+
   <div class="container">
     <div class="card">
       <div class="canvas-container-wrapper">
@@ -347,25 +384,37 @@
     let selectedAudioBuffer = null;
     let audioContext = null;
 
-    // 3. SECURE DOM GUARANTEED CANVAS INITIALIZATION
+    // INITIALIZATION GUARANTEE
     window.addEventListener('DOMContentLoaded', () => {
-      canvas = new fabric.Canvas('collageCanvas', {
-        width: 360,
-        height: 360,
-        backgroundColor: '#ffffff',
-        preserveObjectStacking: true
-      });
-      
-      canvas.calcOffset();
+      try {
+        if (typeof fabric === 'undefined') {
+          throw new Error("Fabric.js library failed to load or was blocked by the browser extension/host CDN policy.");
+        }
 
-      canvas.on('selection:created', onObjectSelected);
-      canvas.on('selection:updated', onObjectSelected);
-      canvas.on('selection:cleared', () => {
-        document.getElementById('transformControls').style.display = 'none';
-      });
-      
-      // Initialize layout elements
-      canvas.renderAll();
+        canvas = new fabric.Canvas('collageCanvas', {
+          width: 360,
+          height: 360,
+          backgroundColor: '#ffffff',
+          preserveObjectStacking: true
+        });
+        
+        canvas.calcOffset();
+
+        canvas.on('selection:created', onObjectSelected);
+        canvas.on('selection:updated', onObjectSelected);
+        canvas.on('selection:cleared', () => {
+          document.getElementById('transformControls').style.display = 'none';
+        });
+        
+        canvas.renderAll();
+        document.getElementById('statusLog').innerText = "Canvas initialised successfully! Ready.";
+      } catch (err) {
+        const debugBox = document.getElementById('runtimeDebugLog');
+        if (debugBox) {
+          debugBox.style.display = 'block';
+          debugBox.innerHTML += `<div>❌ <b>Init Crash:</b> ${err.message}</div>`;
+        }
+      }
     });
 
     function onObjectSelected(e) {
@@ -411,7 +460,6 @@
       document.getElementById('statusLog').innerText = "Cleared all photos from layout!";
     }
 
-    // 4. SECURE ASYNC FILE READER (NO INTERFERENCE FROM CORS CONTEXT ENFORCEMENTS)
     function handleImageFiles(files) {
       if(!canvas || !files.length) return;
       
@@ -562,57 +610,4 @@
     function updateCustomText() {
       if(!canvas) return;
       const textVal = document.getElementById('customText').value;
-      const colorVal = document.getElementById('textColor').value;
-      const bgBarColorVal = document.getElementById('textBgColor').value;
-      const fontVal = document.getElementById('fontStyle').value;
-      const alignVal = document.getElementById('textAlignment').value;
-
-      if (!textVal) {
-        if (textObject) { canvas.remove(textObject); textObject = null; }
-        canvas.renderAll();
-        return;
-      }
-
-      let textOptions = {
-        fill: colorVal,
-        textBackgroundColor: bgBarColorVal,
-        fontFamily: fontVal,
-        textAlign: alignVal,
-        fontSize: 20,
-        fontWeight: 'bold',
-        selectable: true
-      };
-
-      if (alignVal === 'left') {
-        textOptions.left = 20;
-        textOptions.originX = 'left';
-      } else if (alignVal === 'right') {
-        textOptions.left = canvas.width - 20;
-        textOptions.originX = 'right';
-      } else {
-        textOptions.left = canvas.width / 2;
-        textOptions.originX = 'center';
-      }
-
-      if (textObject) {
-        textObject.set(textOptions);
-        textObject.set('text', textVal);
-      } else {
-        textOptions.top = canvas.height - 35;
-        textOptions.originY = 'center';
-        textObject = new fabric.Text(textVal, textOptions);
-        canvas.add(textObject);
-      }
-      
-      arrangeLayerOrder();
-    }
-
-    function downloadCollageImage() {
-      if(!canvas) return;
-      canvas.discardActiveObject();
-      canvas.renderAll();
-      const dataURL = canvas.toDataURL({ format: 'jpeg', quality: 0.95 });
-      const link = document.createElement('a');
-      link.download = 'lifecraft-collage.jpg';
-      link.href = dataURL;
-      l
+      const colorVal = document.getElementById('text
